@@ -257,30 +257,30 @@ class QADataset(Dataset):
             # print(raw_passage)
             # print(passage_ner_types.ents)
 
-            # for idx,w in enumerate(passage):
+            for idx,w in enumerate(passage):
                 
-            #     is_entity = False
-            #     # char_start_ind = sum([len(w) for w in passage[:idx]]) + idx
-            #     # char_end_ind = char_start_ind + len(w)
+                is_entity = False
+                # char_start_ind = sum([len(w) for w in passage[:idx]]) + idx
+                # char_end_ind = char_start_ind + len(w)
 
-            #     for ent in passage_ner_types.ents:
-            #         # print(ent.start, ent.end)
-            #         if ent.start > idx:
-            #             break
-            #         if ent.start <= idx and ent.end > idx :
-            #             is_entity = True
-            #             break
+                for ent in passage_ner_types.ents:
+                    # print(ent.start, ent.end)
+                    if ent.start > idx:
+                        break
+                    if ent.start <= idx and ent.end > idx :
+                        is_entity = True
+                        break
                 
-            #     contains_entity = contains_entity or is_entity
-            #     if w == '.':
-            #         if contains_entity:
-            #             new_passage.extend(passage[start_sent:idx + 1])
-            #         start_sent = idx + 1
-            #         contains_entity = False
+                contains_entity = contains_entity or is_entity
+                if w == '.':
+                    if contains_entity:
+                        new_passage.extend(passage[start_sent:idx + 1])
+                    start_sent = idx + 1
+                    contains_entity = False
 
-            # # print('old length: ', len(passage))
-            # # print('new length: ', len(new_passage))
-            # passage = new_passage
+            # print('old length: ', len(passage))
+            # print('new length: ', len(new_passage))
+            passage = new_passage
 
             for ent in passage_ner_types.ents:
                 if all([w in ent.text for w in filtered_answer_lst]):
