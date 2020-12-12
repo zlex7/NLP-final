@@ -24,7 +24,10 @@ def cuda(args, tensor):
         Tensor on CUDA device.
     """
     if args.use_gpu and torch.cuda.is_available():
+        # print('cuda worked!!!')
         return tensor.cuda()
+    # else:
+        # print('cuda not available!!!')
     return tensor
 
 
@@ -104,8 +107,38 @@ def load_embeddings(path):
                 pass
     return embedding_map
 
+def top_n_spans(start_probs, end_probs, question, passage, window, n=10, k=5):
+    top_k_starts = start_probs.argsort()[-min(k,len(start_probs)):][::-1]
+    # top_k_ends = start_probs.argsort()[-min(k,len(end_probs)):][::-1]
 
-def search_span_endpoints(start_probs, end_probs, window=15):
+    span_lst = []
+    num_per_start = n//k
+    for s_idx in top_k_starts:
+        end_possibilities = end_probs[s_idx:]
+        top_ends = end_possibilities.argsort()[-min(num_per_start,len(end_possiblities)):][::-1]
+        top_ends += s_idx
+        for e_idx in top_ends:
+            span_lst.append((s_idx,e_idx))
+
+    return span_lst
+        # start_probs.argsort()[-min(k,len(start_probs)):][::-1]
+        # for end_index in range(len(end_probs)):
+        #     if max_start_index <= end_index <= max_start_index + window:
+        #         joint_prob = start_probs[max_start_index] * end_probs[end_index]
+        #         if joint_prob > max_joint_prob:
+        #             max_joint_prob = joint_prob
+        #             max_end_index = end_index
+
+        # for e_idx in top_k_ends:
+        #     if e_idx > s_ikdx
+        #     joint_prob = start_probs[s_idx] * end_probs[e_idx]
+
+
+
+
+
+
+def search_span_endpoints(start_probs, end_probs, question, passage, window=15):
     """
     Finds an optimal answer span given start and end probabilities.
     Specifically, this algorithm finds the optimal start probability p_s, then
@@ -124,6 +157,14 @@ def search_span_endpoints(start_probs, end_probs, window=15):
         Optimal starting and ending indices for the answer span. Note that the
         chosen end index is *inclusive*.
     """
+
+    # top_spans = top_n_spans(start_probs, end_probs, question, passage, window)
+
+    # for span in top_spans:
+    #     start, end = span
+        
+
+
     max_start_index = start_probs.index(max(start_probs))
     max_end_index = -1
     max_joint_prob = 0.

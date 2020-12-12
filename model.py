@@ -323,3 +323,97 @@ class BaselineReader(nn.Module):
         )  # [batch_size, p_len]
 
         return start_logits, end_logits  # [batch_size, p_len], [batch_size, p_len]
+
+
+
+
+
+class NERClassifier(nn.Module):
+    def __init__(self, num_ner_labels, args):
+        super().__init__()
+        self.args = args
+        self.pad_token_id = args.pad_token_id
+
+
+        rnn_cell = nn.LSTM if args.rnn_cell_type == 'lstm' else nn.GRU
+
+
+        self.relu = nn.ReLU()
+        self.linear = nn.Linear(args.hidden_dim, num_ner_labels)
+        self.softmax = nn.Softmax()
+        self.embedding = nn.Embedding(args.vocab_size, args.embedding_dim)
+        
+        # this question encoder is for capturing the relationship between the question and the type of Named Entity that should be the answer
+        self.question_rnn = rnn_cell(
+            args.embedding_dim,
+            args.hidden_dim,
+            bidirectional=False,
+            batch_first=True,
+        )
+
+    def load_pretrained_embeddings(self, vocabulary, path):
+        """
+        Loads GloVe vectors and initializes the embedding matrix.
+
+        Args:
+            vocabulary: `Vocabulary` object.
+            path: Embedding path, e.g. "glove/glove.6B.300d.txt".
+        """
+        embedding_map = load_cached_embeddings(path)
+
+        # Create embedding matrix. By default, embeddings are randomly
+        # initialized from Uniform(-0.1, 0.1).
+        embeddings = torch.zeros(
+            (len(vocabulary), self.args.embedding_dim)
+        ).uniform_(-0.1, 0.1)
+
+        # Initialize pre-trained embeddings.
+        num_pretrained = 0
+        for (i, word) in enumerate(vocabulary.words):
+            if word in embedding_map:
+                embeddings[i] = torch.tensor(embedding_map[word])
+                num_pretrained += 1
+
+        # Place embedding matrix on GPU.
+        self.embedding.weight.data = cuda(self.args, embeddings)
+
+        return num_pretrained
+
+    def sorted_rnn(self, sequences, sequence_lengths, rnn):
+        # Sort input sequences
+        sorted_inputs, sorted_sequence_lengths, restoration_indices = _sort_batch_by_length(
+            sequences, sequence_lengths
+        )
+        # Pack input sequences
+        packed_sequence_input = pack_padded_sequence(
+            sorted_inputs,
+            sorted_sequence_lengths.data.long().tolist(),
+            batch_first=True
+        )
+        # Run RNN
+        packed_sequence_output, _ = rnn(packed_sequence_input, None)
+        # Unpack hidden states
+        unpacked_sequence_tensor, _ = pad_packed_sequence(
+            packed_sequence_output, batch_first=True
+        )
+        # Restore the original order in the batch and return all hidden states
+        return unpacked_sequence_tensor.index_select(0, restoration_indices)
+
+
+    def forward(self, batch):
+        passage_mask = (batch['passages'] != self.pad_token_id)  # [batch_size, p_len]
+        question_mask = (batch['questions'] != self.pad_token_id)  # [batch_size, q_len]
+        passage_lengths = passage_mask.long().sum(-1)  # [batch_size]
+        question_lengths = question_mask.long().sum(-1)  # [batch_size]
+
+        # 1) Embedding Layer: Embed the passage and question.
+        passage_embeddings = self.embedding(batch['passages'])  # [batch_size, p_len, p_dim]
+        question_embeddings = self.embedding(batch['questions'])  # [batch_size, q_len, q_dim]
+
+        question_hidden = self.sorted_rnn(
+            question_embeddings, question_lengths, self.question_rnn
+        )
+
+        # print(question_hidden.shape)
+        question_hidden = question_hidden[:, -1, :]
+        return self.softmax(self.linear(question_hidden))

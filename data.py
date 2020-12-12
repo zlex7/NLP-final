@@ -8,13 +8,32 @@ import collections
 import itertools
 import torch
 
+import numpy as np
+
 from torch.utils.data import Dataset
 from random import shuffle
 from utils import cuda, load_dataset
 
+from nltk.corpus import stopwords
+import nltk
+nltk.download('stopwords')
+from nltk.tokenize import word_tokenize
 
 PAD_TOKEN = '[PAD]'
 UNK_TOKEN = '[UNK]'
+
+import spacy
+
+nlp = spacy.load("en_core_web_sm")
+
+NER_LABELS = ['CARDINAL', 'DATE', 'EVENT', 'FAC', 'GPE', 'LANGUAGE', 'LAW', 'LOC', 'MONEY', 'NORP', 'ORDINAL', 'ORG', 'PERCENT', 'PERSON', 'PRODUCT', 'QUANTITY', 'TIME', 'WORK_OF_ART']
+
+NER_MAPPINGS = {NER_LABELS[idx]: idx for idx in range(len(NER_LABELS))}
+
+def map_ner_label_to_idx(ner_label):
+    if ner_label in NER_MAPPINGS:
+        return NER_MAPPINGS[ner_label]
+    return len(NER_LABELS)
 
 
 class Vocabulary:
@@ -160,7 +179,7 @@ class QADataset(Dataset):
             passage = [
                 token.lower() for (token, offset) in elem['context_tokens']
             ][:self.args.max_context_length]
-
+            
             # Each passage has several questions associated with it.
             # Additionally, each question has multiple possible answer spans.
             for qa in elem['qas']:
@@ -179,6 +198,7 @@ class QADataset(Dataset):
                 )
                 
         return samples
+
 
     def _create_data_generator(self, shuffle_examples=False):
         """
@@ -203,10 +223,12 @@ class QADataset(Dataset):
         questions = []
         start_positions = []
         end_positions = []
+        ner_types = []
         for idx in example_idxs:
             # Unpack QA sample and tokenize passage/question.
+            # print(self.samples[idx])
             qid, passage, question, answer_start, answer_end = self.samples[idx]
-
+            raw_passage = ' '.join(passage)
             # Convert words to tensor.
             passage_ids = torch.tensor(
                 self.tokenizer.convert_tokens_to_ids(passage)
@@ -216,14 +238,79 @@ class QADataset(Dataset):
             )
             answer_start_ids = torch.tensor(answer_start)
             answer_end_ids = torch.tensor(answer_end)
+            # print(passage)
+            answer = passage[answer_start:answer_end+1]
+            ner_type = None
+            passage_ner_types = nlp(raw_passage)
+            
+            filtered_answer_lst = [word for word in answer if not word in stopwords.words()]
 
+            # period_inds = passage.find('.')
+            # period_inds = []
+            new_passage = []
+            
+            start_sent = 0
+            contains_entity = False
+            
+            # print(raw_passage)
+            # print(passage_ner_types.ents)
+
+            for idx,w in enumerate(passage):
+                
+                is_entity = False
+                # char_start_ind = sum([len(w) for w in passage[:idx]]) + idx
+                # char_end_ind = char_start_ind + len(w)
+
+                for ent in passage_ner_types.ents:
+                    # print(ent.start, ent.end)
+                    if ent.start <= idx and ent.end > idx :
+                        is_entity = True
+                        break
+                
+                contains_entity = contains_entity or is_entity
+                if w == '.':
+                    if contains_entity:
+                        new_passage.extend(passage[start_sent:idx + 1])
+                    start_sent = idx + 1
+                    contains_entity = False
+
+            # print('old length: ', len(passage))
+            # print('new length: ', len(new_passage))
+            passage = new_passage
+
+            for ent in passage_ner_types.ents:
+                if all([w in ent.text for w in filtered_answer_lst]):
+                    ner_type = ent.label_
+                    break
+            
+
+            # print(question)
+            # print(passage)
+            # print(question)
+            # print(raw_passage)
+            # print(passage_ner_types.ents)
+            # print(answer)
+            # print(filtered_answer_lst)
+            # print(ner_type)
+            # print()
+
+            # ner_types = nlp(' '.join(pass))
+            # ner_type = nlp(' '.join(answer))
+            # print(ner_type.ents)
+            if ner_type is None:
+                ner_type = torch.tensor([len(NER_LABELS)])
+            else:
+                ner_type = map_ner_label_to_idx(ner_type)
+                ner_type = torch.tensor(ner_type)
+            # print('final NER type: ', ner_type)
             # Store each part in an independent list.
             passages.append(passage_ids)
             questions.append(question_ids)
             start_positions.append(answer_start_ids)
             end_positions.append(answer_end_ids)
-
-        return zip(passages, questions, start_positions, end_positions)
+            ner_types.append(ner_type)
+        print(np.bincount(ner_types) / len(ner_types))
+        return zip(passages, questions, start_positions, end_positions, ner_types)
 
     def _create_batches(self, generator, batch_size):
         """
@@ -256,6 +343,7 @@ class QADataset(Dataset):
 
             passages = []
             questions = []
+            ner_types = torch.zeros(bsz)
             start_positions = torch.zeros(bsz)
             end_positions = torch.zeros(bsz)
             max_passage_length = 0
@@ -266,6 +354,8 @@ class QADataset(Dataset):
                 questions.append(current_batch[ii][1])
                 start_positions[ii] = current_batch[ii][2]
                 end_positions[ii] = current_batch[ii][3]
+                ner_types[ii] = current_batch[ii][4]
+
                 max_passage_length = max(
                     max_passage_length, len(current_batch[ii][0])
                 )
@@ -288,7 +378,8 @@ class QADataset(Dataset):
                 'passages': cuda(self.args, padded_passages).long(),
                 'questions': cuda(self.args, padded_questions).long(),
                 'start_positions': cuda(self.args, start_positions).long(),
-                'end_positions': cuda(self.args, end_positions).long()
+                'end_positions': cuda(self.args, end_positions).long(),
+                'ner_types': cuda(self.args, ner_types).long()
             }
 
             if no_more_data:

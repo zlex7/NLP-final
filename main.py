@@ -421,6 +421,7 @@ def write_predictions(args, model, dataset):
             for j in range(start_logits.size(0)):
                 # Find question index and passage.
                 sample_index = args.batch_size * i + j
+                # print(dataset.samples)
                 qid, passage, _, _, _ = dataset.samples[sample_index]
 
                 # Unpack start and end probabilities. Find the constrained
@@ -428,7 +429,8 @@ def write_predictions(args, model, dataset):
                 start_probs = unpack(batch_start_probs[j])
                 end_probs = unpack(batch_end_probs[j])
                 start_index, end_index = search_span_endpoints(
-                        start_probs, end_probs
+                        start_probs, end_probs,
+                        question, passage
                 )
                 
                 # Grab predicted span.
@@ -537,6 +539,7 @@ def main(args):
     if args.do_test:
         # Write predictions to the output file. Use the printed command
         # below to obtain official EM/F1 metrics.
+        # np.shuffle(dev_dataset)
         write_predictions(args, model, dev_dataset)
         eval_cmd = (
             'python3 evaluate.py '
@@ -547,6 +550,8 @@ def main(args):
         print(f'predictions written to \'{args.output_path}\'')
         print(f'compute EM/F1 with: \'{eval_cmd}\'')
         print()
+
+    
 
 
 if __name__ == '__main__':
