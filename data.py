@@ -225,6 +225,8 @@ class QADataset(Dataset):
         end_positions = []
         ner_types = []
         for idx in example_idxs:
+            if idx % 50 == 0:
+                print(idx)
             # Unpack QA sample and tokenize passage/question.
             # print(self.samples[idx])
             qid, passage, question, answer_start, answer_end = self.samples[idx]
