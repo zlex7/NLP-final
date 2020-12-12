@@ -154,6 +154,7 @@ def find_ngrams_upto(input_list, n):
 def contains_special_char(input_list):
     return any([not w.strip().isalpha() for w in input_list])
 
+import numpy as np
 def search_span_endpoints(start_probs, end_probs, question, passage, window=15, k=3):
     """
     Finds an optimal answer span given start and end probabilities.
