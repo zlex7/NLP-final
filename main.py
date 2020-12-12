@@ -310,6 +310,7 @@ def train(args, epoch, model, dataset):
         **_TQDM_OPTIONS,
     )
 
+    idx = 0
     for batch in train_dataloader:
         # Zero gradients.
         optimizer.zero_grad()
@@ -330,9 +331,11 @@ def train(args, epoch, model, dataset):
         # Update tqdm bar.
         train_loss += loss.item()
         train_steps += 1
+        print(idx, train_loss / train_steps)
         train_dataloader.set_description(
             f'[train] epoch = {epoch}, loss = {train_loss / train_steps:.6f}'
         )
+        idx += 1
 
     return train_loss / train_steps
 
