@@ -146,7 +146,7 @@ def flatten(t):
     return flat_list
 
 def find_ngrams_upto(input_list, n):
-    multigrams = [find_ngrams(input_list,i) for i in range(1,min(k + 1,len(input_list)))]
+    multigrams = [find_ngrams(input_list,i) for i in range(1,min(n + 1,len(input_list)))]
     multigrams = set(flatten(multigrams))
     return multigrams
 
