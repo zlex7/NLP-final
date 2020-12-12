@@ -433,7 +433,7 @@ def write_predictions(args, model, dataset):
                 end_probs = unpack(batch_end_probs[j])
                 start_index, end_index = search_span_endpoints(
                         start_probs, end_probs,
-                        question, passage
+                        qid, passage
                 )
                 
                 # Grab predicted span.
