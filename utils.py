@@ -175,37 +175,37 @@ def search_span_endpoints(start_probs, end_probs, question, passage, window=15, 
         chosen end index is *inclusive*.
     """
 
-    q_multigrams = find_ngrams_upto(question, k)
-    start_probs = np.array(start_probs)
-    end_probs = np.array(end_probs)
-    top_spans = top_n_spans(start_probs, end_probs, question, passage, window)
+    # q_multigrams = find_ngrams_upto(question, k)
+    # start_probs = np.array(start_probs)
+    # end_probs = np.array(end_probs)
+    # top_spans = top_n_spans(start_probs, end_probs, question, passage, window)
 
-    best_overlap = set()
-    best_start = top_spans[0][0]
-    best_end = top_spans[0][1]
-    for span in top_spans:
-        start, end = span
-        words = passage[start:end + 1]
-        multigrams = find_ngrams_upto(words, k)
-        overlap = multigrams.intersection(q_multigrams)
-        if len(overlap) > len(best_overlap):
-            best_overlap = overlap
-            best_start = start
-            best_end = end
-    return best_start, best_end
+    # best_overlap = set()
+    # best_start = top_spans[0][0]
+    # best_end = top_spans[0][1]
+    # for span in top_spans:
+    #     start, end = span
+    #     words = passage[start:end + 1]
+    #     multigrams = find_ngrams_upto(words, k)
+    #     overlap = multigrams.intersection(q_multigrams)
+    #     if len(overlap) > len(best_overlap):
+    #         best_overlap = overlap
+    #         best_start = start
+    #         best_end = end
+    # return best_start, best_end
 
         
 
 
-    # max_start_index = start_probs.index(max(start_probs))
-    # max_end_index = -1
-    # max_joint_prob = 0.
+    max_start_index = start_probs.index(max(start_probs))
+    max_end_index = -1
+    max_joint_prob = 0.
 
-    # for end_index in range(len(end_probs)):
-    #     if max_start_index <= end_index <= max_start_index + window:
-    #         joint_prob = start_probs[max_start_index] * end_probs[end_index]
-    #         if joint_prob > max_joint_prob:
-    #             max_joint_prob = joint_prob
-    #             max_end_index = end_index
+    for end_index in range(len(end_probs)):
+        if max_start_index <= end_index <= max_start_index + window:
+            joint_prob = start_probs[max_start_index] * end_probs[end_index]
+            if joint_prob > max_joint_prob:
+                max_joint_prob = joint_prob
+                max_end_index = end_index
 
-    # return (max_start_index, max_end_index)
+    return (max_start_index, max_end_index)
