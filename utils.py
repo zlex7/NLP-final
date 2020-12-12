@@ -107,7 +107,7 @@ def load_embeddings(path):
                 pass
     return embedding_map
 
-def top_n_spans(start_probs, end_probs, question, passage, window, n=10, k=5):
+def top_n_spans(start_probs, end_probs, question, passage, window, n=4, k=2):
     top_k_starts = start_probs.argsort()[-min(k,len(start_probs)):][::-1]
     # top_k_ends = start_probs.argsort()[-min(k,len(end_probs)):][::-1]
 
@@ -134,11 +134,27 @@ def top_n_spans(start_probs, end_probs, question, passage, window, n=10, k=5):
         #     joint_prob = start_probs[s_idx] * end_probs[e_idx]
 
 
+def find_ngrams(input_list, n):
+    return zip(*[input_list[i:] for i in range(n)])    
 
 
+def flatten(t):
+    flat_list = []
+    for sublist in t:
+        for item in sublist:
+            flat_list.append(item)
+    return flat_list
 
+def find_ngrams_upto(input_list, n):
+    multigrams = [find_ngrams(input_list,i) for i in range(1,min(k + 1,len(input_list)))]
+    multigrams = set(flatten(multigrams))
+    return multigrams
 
-def search_span_endpoints(start_probs, end_probs, question, passage, window=15):
+# used for unigram test
+def contains_special_char(input_list):
+    return any([not w.strip().isalpha() for w in input_list])
+
+def search_span_endpoints(start_probs, end_probs, question, passage, window=15, k=3):
     """
     Finds an optimal answer span given start and end probabilities.
     Specifically, this algorithm finds the optimal start probability p_s, then
@@ -158,22 +174,35 @@ def search_span_endpoints(start_probs, end_probs, question, passage, window=15):
         chosen end index is *inclusive*.
     """
 
-    # top_spans = top_n_spans(start_probs, end_probs, question, passage, window)
+    q_multigrams = find_ngrams_upto(question, k)
+    top_spans = top_n_spans(start_probs, end_probs, question, passage, window)
 
-    # for span in top_spans:
-    #     start, end = span
+    best_overlap = set()
+    best_start = top_spans[0][0]
+    best_end = top_spans[0][1]
+    for span in top_spans:
+        start, end = span
+        words = passage[start:end + 1]
+        multigrams = find_ngrams_upto(words, k)
+        overlap = multigrams.intersection(q_multigrams)
+        if len(overlap) > len(best_overlap):
+            best_overlap = overlap
+            best_start = start
+            best_end = end
+    return best_start, best_end
+
         
 
 
-    max_start_index = start_probs.index(max(start_probs))
-    max_end_index = -1
-    max_joint_prob = 0.
+    # max_start_index = start_probs.index(max(start_probs))
+    # max_end_index = -1
+    # max_joint_prob = 0.
 
-    for end_index in range(len(end_probs)):
-        if max_start_index <= end_index <= max_start_index + window:
-            joint_prob = start_probs[max_start_index] * end_probs[end_index]
-            if joint_prob > max_joint_prob:
-                max_joint_prob = joint_prob
-                max_end_index = end_index
+    # for end_index in range(len(end_probs)):
+    #     if max_start_index <= end_index <= max_start_index + window:
+    #         joint_prob = start_probs[max_start_index] * end_probs[end_index]
+    #         if joint_prob > max_joint_prob:
+    #             max_joint_prob = joint_prob
+    #             max_end_index = end_index
 
-    return (max_start_index, max_end_index)
+    # return (max_start_index, max_end_index)
