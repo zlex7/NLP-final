@@ -115,7 +115,7 @@ def top_n_spans(start_probs, end_probs, question, passage, window, n=4, k=2):
     num_per_start = n//k
     for s_idx in top_k_starts:
         end_possibilities = end_probs[s_idx:]
-        top_ends = end_possibilities.argsort()[-min(num_per_start,len(end_possiblities)):][::-1]
+        top_ends = end_possibilities.argsort()[-min(num_per_start,len(end_possibilities)):][::-1]
         top_ends += s_idx
         for e_idx in top_ends:
             span_lst.append((s_idx,e_idx))
