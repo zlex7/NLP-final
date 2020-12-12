@@ -263,6 +263,8 @@ class QADataset(Dataset):
 
                 for ent in passage_ner_types.ents:
                     # print(ent.start, ent.end)
+                    if ent.start > idx:
+                        break
                     if ent.start <= idx and ent.end > idx :
                         is_entity = True
                         break
